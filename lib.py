@@ -1,3 +1,4 @@
+import hashlib
 import os
 import re
 
@@ -26,7 +27,7 @@ def sort_files(filelist):
             if not img:
                 t = 'other'
             else:
-                t = 'image-%s' % img
+                t = 'image'
 
         if t not in types:
             types[t] = []
@@ -101,6 +102,10 @@ def get_real_date(dates):
     res['date'] = earliest
     res['allmatch'] = allmatch
     return res
+
+
+def get_file_hash(fobj):
+    return hashlib.md5(fobj.read())
 
 
 # Show debug messages

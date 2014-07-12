@@ -31,36 +31,43 @@ print('')
 print('Scanning images for dates and hashes...')
 
 sources = {}
-not_allsame = []
 dates = {}
+not_allsame = []
+hashes = {}
+
 
 import_metadata = {}
-for key in import_sorted.keys():
-    if not key.startswith('image-'):
-        continue
-
-    for f in import_sorted[key]:
-        # Load file
+if 'image' in import_sorted:
+    for f in import_sorted['image']:
+        # Load file and grab details
         with open(f) as fobj:
             metadata = {}
             datedata = lib.get_date_data(f, fobj)
             metadata['datedata'] = lib.get_real_date(datedata)
             metadata['date'] = metadata['datedata']['date']
+            metadata['hash'] = lib.get_file_hash(fobj)
 
+            # Sort for reporting
             if metadata['datedata']['source'] not in sources:
                 sources[metadata['datedata']['source']] = 0
-
             sources[metadata['datedata']['source']] += 1
 
             if metadata['date'][0:7] not in dates:
                 dates[metadata['date'][0:7]] = 0
-
             dates[metadata['date'][0:7]] += 1
 
             if not metadata['datedata']['allmatch']:
                 not_allsame.append(f)
 
+            # Check for duplicates
+            if metadata['hash'] in hashes:
+                print('ERROR: found duplicates! (%s, %s)' % (hashes[metadata['hash']], f))
+            else:
+                hashes[metadata['hash']] = f
+
+
         import_metadata[str(f)] = metadata
+
 
 print('')
 print('Sources:')
