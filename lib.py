@@ -78,7 +78,7 @@ def get_real_date(dates):
 
     if len(dates) == 1:
         res['source'] = 'ctime'
-        res['date'] = dates['ctime']
+        res['date'] = dates['ctime'].format('YYYY-MM-DD')
         res['allmatch'] = True
         return res
 
