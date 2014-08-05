@@ -37,32 +37,42 @@ def sort_files(filelist):
     return types
 
 
-# Get date data
-def get_date_data(fpath, fobj):
-
+def get_exif_data(fobj):
     # Get exif tags
-    tags = exifread.process_file(fobj, details=False)
-    for t in tags.keys():
-        if re.search('gps', t.lower()):
-            del tags[t]
+    return exifread.process_file(fobj, details=False)
+
+
+# Get date data
+def get_date_data(fpath, exif):
+
+    tags = {}
+    
+    # Check filename for a date
+    m = re.search(re.compile('(?<![0-9])(20[0-9]{2})-?([0-9]{2})-?([0-9]{2})(?![0-9])'), pathlib.Path(fpath).name)
+    if m:
+        tags['pathtime'] = '%s-%s-%s' % (m.group(0), m.group(1), m.group(2))
+
+    # Add exif dates
+    for ex in exif.keys():
+        if re.search('gps', ex.lower()):
             continue
 
-        if not re.search('date', t.lower()):
-            del tags[t]
+        if not re.search('date', ex.lower()):
+            continue
+
+        tags[ex] = exif[ex]
 
     # Get file creation time
     tags['ctime'] = os.path.getctime(fpath)
 
-    # Check filename for a date
-    m = re.search(re.compile('(20[0-9]{2}-?[0-9]{2}-?[0-9]{2})'), pathlib.Path(fpath).name)
-    if m:
-        match = m.group(0)
-        tags['pathtime'] = '%s-%s-%s' % (match[0:4], match[4:6], match[6:8])
-
     # Normalize all the dates
-    for t in tags:
-        tags[t] = arrow.get(str(tags[t]))
-#        debug('%s: %s' % (t, tags[t]))
+    for t in tags.keys():
+        try:
+            tags[t] = arrow.get(str(tags[t]))
+        except arrow.parser.ParserError:
+            debug('Skipping %s for %s' % (t, fpath))
+            debug(repr(tags[t]))
+            del tags[t]
 
     return tags
 
@@ -70,15 +80,25 @@ def get_date_data(fpath, fobj):
 # Get real date
 def get_real_date(dates):
 
+    # If we have a reliable source, then ditch the dodgy ones
+    if 'EXIF DateTimeOriginal' in dates:
+        # Ignore 'Image DateTime' as it's wrong
+        if 'Image DateTime' in dates:
+            del dates['Image DateTime']
+        # Ignore 'Thumbnail DateTime' as it's wrong
+        if 'Thumbnail DateTime' in dates:
+            del dates['Thumbnail DateTime']
+
     res = {
         'source': None,
         'date': None,
         'allmatch': None
     }
 
-    if len(dates) == 1:
+    # If all we have is ctime, then go with that
+    if 'ctime' in dates and len(dates) == 1:
         res['source'] = 'ctime'
-        res['date'] = dates['ctime'].format('YYYY-MM-DD')
+        res['date'] = dates['ctime'].format('YYYY-MM')
         res['allmatch'] = True
         return res
 
@@ -88,7 +108,8 @@ def get_real_date(dates):
         if date == 'ctime':
             continue
 
-        d = dates[date].format('YYYY-MM-DD')
+        # We only care about dates at month-level detail
+        d = dates[date].format('YYYY-MM')
         if earliest == None:
             earliest = d
             res['source'] = date
@@ -105,7 +126,7 @@ def get_real_date(dates):
 
 
 def get_file_hash(fobj):
-    return hashlib.md5(fobj.read())
+    return hashlib.md5(fobj.read()).hexdigest()
 
 
 # Show debug messages
